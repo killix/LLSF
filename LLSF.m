@@ -44,13 +44,7 @@ function [model_ML]=LSCF_ML_SF( X, train_target,optmParameter)
     u_k = u0;
 
     while iter<=maxIter
-      %% solution 1
-       %enta=(1/iter)*0.001;
-       %gradient_W_s = (XTX*W_s - X'*train_target') + lambda1 * W_s*R;
-       %W_s_hat = W_s - enta*gradient_W_s;
-       %W_s = softthres(W_s_hat,lambda1/Lip);
-       
-      %% solution 2
+
        W_s_k = W_s + (bk_1 - 1)/bk * (W_s - W_s_1);
        Gw_s_k = W_s_k - 1/Lip * u_k* ((XTX*W_s_k - XTY) + lambda1 * W_s_k*R);
        bk_1 = bk;
