@@ -1,63 +1,76 @@
-% This function is designed to learning the label specific features and
-% common features which shared by all the binary linear regression models
-% The function Output the models parameters
-% loss=||XW_s - Y||F^2 + lambda1 Tr(RW_s^TW_s) + lambda2||W_s||1 
+
+function [model_LLSF] = LLSF( X, Y, optmParameter)
+% This function is designed to learning the label specific features each label and
+% common features which shared by each combination of two labels.
+% 
+%
+%    Syntax
+%
+%       [model_LLSF] = LLSF( X, train_target,optmPara)
+%
+%    Input
+%       X           - a n by d data matrix, n is the number of instances and d is the number of features 
+%       Y           - a n by l label matrix, n is the number of instances and l is the number of labels
+%       optmPara    - A struct variable with seven fields, the optimization parameters for LLSF
+%                   1) alpha            - weight for label correlation
+%                   2) beta             - weight for sparsity
+%                   3) gama             - weight for linear regression
+%                   4) maxIter          - number of maximum iterations
+%                   5) miniLossMargin   - minmum loss margin between two iterations
+%                   6  drawConvergence  - whether drawing the convegence line, {1 - yes, 0 - not}
+%                   7) outputtempresult - whether outputing the temporal resutls, {1 - yes, 0 - not}
+%   Output
+%
+%       model_LLSF  - a d by l Coefficient matrix
+%
+%[1] J. Huang, G.-R Li, Q.-M. Huang and X.-D. Wu. Learning Label Specific Features for Multi-Label Classifcation. 
+%    In: Proceedings of the International Conference on Data Mining, 2015.
 
     
-function [model_ML]=LSCF_ML_SF( X, train_target,optmParameter)
-    loss=0;
     %% optimization parameters
-    alpha=optmParameter.alpha;
-    lambda1 = optmParameter.lambda1;
-    lambda2 = optmParameter.lambda2;
-    maxIter = optmParameter.maxIter;
-    minimumLossMargin = optmParameter.minimumLossMargin;
+    
+    alpha            = optmParameter.alpha;
+    beta             = optmParameter.beta;
+    gamma            = optmParameter.gamma;
+    maxIter          = optmParameter.maxIter;
+    miniLossMargin   = optmParameter.minimumLossMargin;
     outputtempresult = optmParameter.outputtempresult;
 
     num_dim = size(X,2);
-    num_class = size(train_target,1);
     
     XTX = X'*X;
-    XTY = X'*train_target';
-    W_s = (XTX + alpha*eye(num_dim)) \ (XTY);
-    % W_s = rand(num_dim,num_class);
-    % W_s = zeros(num_dim,num_class);
+    XTY = X'*Y;
     
+    W_s   = (XTX + gamma*eye(num_dim)) \ (XTY);
     W_s_1 = W_s;
-    
-    %R=chowLiuTree(train_target, [0 1]);
-    %R=ones(size(R))-R;
-    R = pdist2( train_target+eps, train_target+eps, 'cosine' );
+    R     = pdist2( Y'+eps, Y'+eps, 'cosine' );
 
 
-    iter=1;
+    iter    = 1;
+    loss    = 0;
     oldloss = 0;
     
-    %Lip = sqrt(2*(norm(XTX)^2 + norm(lambda1*R)^2));
-    Lip = norm(XTX) + norm(lambda1*R);
+    Lip = sqrt(2*(norm(XTX)^2 + norm(alpha*R)^2));
+    %Lip = norm(XTX) + norm(lambda1*R);
     
-    bk_1 = 1; bk = 1;
-    u0 = 1;
-    theta = 10^(-9);
-    enta = 0.9;
-    u_ = theta*u0;
-    u_k = u0;
+    bk = 1;
+    bk_1 = 1; 
+    u_k = 1;
+    while iter <= maxIter
 
-    while iter<=maxIter
-
-       W_s_k = W_s + (bk_1 - 1)/bk * (W_s - W_s_1);
-       Gw_s_k = W_s_k - 1/Lip * u_k* ((XTX*W_s_k - XTY) + lambda1 * W_s_k*R);
-       bk_1 = bk;
-       bk = (1 + sqrt(4*bk^2 + 1))/2;
-       W_s_1 = W_s;
-       W_s = softthres(Gw_s_k,lambda2/Lip);
+       W_s_k  = W_s + (bk_1 - 1)/bk * (W_s - W_s_1);
+       Gw_s_k = W_s_k - 1/Lip * u_k* ((XTX*W_s_k - XTY) + alpha * W_s_k*R);
+       bk_1   = bk;
+       bk     = (1 + sqrt(4*bk^2 + 1))/2;
+       W_s_1  = W_s;
+       W_s    = softthres(Gw_s_k,beta/Lip);
        
       %%
-       specificloss = trace((X*W_s - train_target')'*(X*W_s - train_target'));
-       traceW_S = trace(R*W_s'*W_s);
-       sparesW_s = sum(sum(W_s~=0));
+       specificloss = trace((X*W_s - Y)'*(X*W_s - Y));
+       traceW_S     = trace(R*W_s'*W_s);
+       sparesW_s    = sum(sum(W_s~=0));
        
-       totalloss = specificloss + lambda1*traceW_S + lambda2*sparesW_s;
+       totalloss = specificloss + alpha*traceW_S + beta*sparesW_s;
        
        if outputtempresult==1
             disp(['iteration ---  ',num2str(iter),'th/',num2str(maxIter)]);
@@ -67,13 +80,13 @@ function [model_ML]=LSCF_ML_SF( X, train_target,optmParameter)
             disp(['         total loss: ',num2str(totalloss)]);
        end
        
-       if loss==0
+       if loss == 0
            loss = totalloss;
-       elseif loss>=0
+       elseif loss >= 0
            loss = [loss,totalloss];
        end
        
-       if abs(oldloss - totalloss) <= minimumLossMargin
+       if abs(oldloss - totalloss) <= miniLossMargin
            break;
        elseif totalloss <=0
            break;
@@ -83,14 +96,14 @@ function [model_ML]=LSCF_ML_SF( X, train_target,optmParameter)
        
        iter=iter+1;
     end
-    
+
     if optmParameter.drawConvergence == 1
         x=1:length(loss);
         figure;
         plot(x,loss);
     end
     
-    model_ML.W_s = W_s;
+    model_LLSF = W_s;
 
 end
 
